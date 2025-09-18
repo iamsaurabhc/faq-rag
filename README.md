@@ -397,7 +397,3 @@ docker-compose ps
 - **Caching Layer**: Redis for improved performance
 - **CDN Integration**: Global content delivery
 - **Monitoring**: Comprehensive observability stack
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
