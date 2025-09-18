@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # ArangoDB service for future data persistence and analytics
+  arangodb:
+    image: arangodb:3.11
+    container_name: faq-arangodb
+    environment:
+      ARANGO_ROOT_PASSWORD: faq_system_2024
+      ARANGO_NO_AUTH: "false"
+    ports:
+      - "8529:8529"
+    volumes:
+      - arango_data:/var/lib/arangodb3
+      - arango_apps:/var/lib/arangodb3-apps
+    networks:
+      - faq_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8529/_api/version"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Main FAQ application
+  faq-app:
+    build: .
+    container_name: faq-app
+    environment:
+      # OpenAI API configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # Database configuration
+      ARANGO_URL: http://arangodb:8529
+      ARANGO_USERNAME: root
+      ARANGO_PASSWORD: faq_system_2024
+      ARANGO_DATABASE: faq_system
+      
+      # Application configuration
+      APP_ENV: production
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: "*"
+      
+      # Performance tuning
+      EMBEDDING_CACHE_SIZE: 1000
+      MAX_CONCURRENT_REQUESTS: 10
+      
+    ports:
+      - "8000:8000"
+    volumes:
+      - app_logs:/app/logs
+      - app_data:/app/data
+    networks:
+      - faq_network
+    depends_on:
+      - arangodb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Nginx reverse proxy for production deployment (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: faq-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - faq_network
+    depends_on:
+      - faq-app
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  arango_data:
+    driver: local
+  arango_apps:
+    driver: local
+  app_logs:
+    driver: local
+  app_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  faq_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16 
